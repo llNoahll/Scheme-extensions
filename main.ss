@@ -313,24 +313,43 @@
   (λ ()
     (error 'amb "Amb tree exhausted!")))
 
+
+;; (define-syntax amb
+;;   (syntax-rules ()
+;;     [(_ expression ...)
+;;      (let ([prev-amb-fail amb-fail])
+;;        (call/cc
+;;         (λ (k-success)
+;;           (call/cc
+;;            (λ (k-failure)
+;;              (set! amb-fail
+;;                (λ ()
+;;                  (set! amb-fail prev-amb-fail)
+;;                  (k-failure 'fail)))
+;;              (k-success expression)))
+;;           ...
+;;
+;;           (prev-amb-fail))))]))
+
 (define-syntax amb
   (syntax-rules ()
-    [(_) (amb-fail)]                     ; Two shortcuts.
+    [(_) (amb-fail)]                       ; Two shortcuts.
     [(_ expression) expression]
     [(_ expression ...)
-     (let ([fail-save amb-fail])
-       ((call/cc                     ; Capture a continuation to
-         (λ (k-success)              ;   which we return possibles.
+     (let ([prev-amb-fail amb-fail])
+       ((call/cc                           ; Capture a continuation to
+         (λ (k-success)                    ;   which we return possibles.
            (call/cc
-            (λ (k-failure)           ; k-failure will try the next
-              (set! amb-fail             ;   possible expression.
+            (λ (k-failure)                 ; k-failure will try the next
+              (set! amb-fail               ;   possible expression.
                 (λ () (k-failure #f)))
-              (k-success             ; Note that the expression is
-               (λ ()                 ;   evaluated in tail position
-                 expression))))      ;   with respect to AMB.
+              (k-success                   ; Note that the expression is
+               (λ ()                       ;   evaluated in tail position
+                 expression))))            ;   with respect to AMB.
            ...
-           (set! amb-fail fail-save)     ; Finally, if this is reached,
-           fail-save))))]))          ;   we restore the saved fail.
+
+           (set! amb-fail prev-amb-fail)   ; Finally, if this is reached,
+           prev-amb-fail))))]))            ;   we restore the saved fail.
 
 (define request
   (λ (condition)
