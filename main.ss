@@ -34,18 +34,48 @@
 ;;      (λ (x) (f (x x))))))
 
 
+(define-syntax nand
+  (syntax-rules ()
+    [(_ expr ...)
+     (not (and expr ...))]))
+
+(define-syntax nor
+  (syntax-rules ()
+    [(_ expr ...)
+     (not (or expr ...))]))
+
+(define-syntax implies
+  (syntax-rules ()
+    [(_ expr1 expr2)
+     (if expr1 expr2 #t)]))
+
+(define xor
+  (λ (expr1 expr2)
+    (or (and (not expr1) expr2)
+        (and expr1 (not expr2)))))
+
 (define true #t)
 (define false #f)
+(define (true?  val) (not (false? val)))
+(define (false? val) (not val))
+
+
 (define nil '())
 (define null '())
 (define empty '())
 
-(define (false? val) (not val))
-(define (true? val) (not (false? val)))
+(define (nil? value) (nil? value))
+(define (empty? value) (null? value))
 
-(define (displayln datum)
-  (display datum)
-  (newline))
+
+(define displayln
+  (case-lambda
+   [(datum)
+    (display datum)
+    (newline)]
+   [(datum out)
+    (display datum out)
+    (newline)]))
 
 (define (/= . args) (not (apply = args)))
 
@@ -204,7 +234,6 @@
 (define (stream-cddddr stream) (stream-cdr (stream-cdddr stream)))
 
 
-
 (define empty-stream '())
 (define stream-empty? null?)
 
@@ -314,6 +343,7 @@
     (error 'amb "Amb tree exhausted!")))
 
 
+;;; Wang Yin's amb:
 ;; (define-syntax amb
 ;;   (syntax-rules ()
 ;;     [(_ expression ...)
