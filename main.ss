@@ -137,21 +137,40 @@
   (λ (proc)
     (let ([already-run? #f] [result #f])
       (λ ()
-        (if (not already-run?)
-            (begin (set! result (proc))
-                   (set! already-run? #t)
-                   result)
-            result)))))
+        (cond [(not already-run?)
+               (set! result (proc))
+               (set! already-run? #t)
+               result]
+              [else result])))))
+
+(define-syntax my-delay
+  (syntax-rules ()
+    [(_ exp) (memo-proc (λ () exp))]))
+
+(define my-force
+  (λ (delayed-exp)
+    (delayed-exp)))
 
 (define-syntax stream-cons
   (syntax-rules ()
-    [(stream-cons x y) (cons x (delay y))]))
+    [(stream-cons x y) (cons x (my-delay y))]))
+
+(define-syntax stream
+  (syntax-rules ()
+    [(_) empty-stream]
+    [(_ arg1) (stream-cons arg1 empty-stream)]
+    [(_ arg1 arg2 ...) (stream-cons arg1 (stream arg2 ...))]))
+
+(define-syntax stream*
+  (syntax-rules ()
+    [(_ arg1) arg1]
+    [(_ arg1 arg2 ...) (stream-cons arg1 (stream* arg2 ...))]))
 
 (define (stream-first stream) (car stream))
-(define (stream-rest stream) (force (cdr stream)))
+(define (stream-rest  stream) (my-force (cdr stream)))
 
 (define (stream-car stream) (car stream))
-(define (stream-cdr stream) (force (cdr stream)))
+(define (stream-cdr stream) (my-force (cdr stream)))
 
 (define (stream-caar stream) (stream-car (stream-car stream)))
 (define (stream-cadr stream) (stream-car (stream-cdr stream)))
