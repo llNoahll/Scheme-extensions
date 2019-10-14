@@ -271,8 +271,7 @@
          (enumerate-tree
           (left-branch tree))
          (enumerate-tree
-          (right-branch tree)))))
-  )
+          (right-branch tree))))))
 
 (define enumerate-interval
   (λ (low high)
