@@ -68,14 +68,23 @@
 (define (empty? value) (null? value))
 
 
+(define writeln
+  (case-λ
+   [(datum)
+    (write datum)
+    (newline)]
+   [(datum out)
+    (write datum out)
+    (newline out)]))
+
 (define displayln
-  (case-lambda
+  (case-λ
    [(datum)
     (display datum)
     (newline)]
    [(datum out)
     (display datum out)
-    (newline)]))
+    (newline out)]))
 
 (define (/= . args) (not (apply = args)))
 
@@ -277,8 +286,8 @@
      [(stream-empty? s) empty-stream]
      [(pred (stream-car s))
       (stream-cons (stream-car s)
-                   (filter pred (stream-cdr s)))]
-     [else (filter pred (stream-cdr s))])))
+                   (stream-filter pred (stream-cdr s)))]
+     [else (stream-filter pred (stream-cdr s))])))
 
 (define stream-accumulate
   (λ (combiner init-val s)
@@ -363,23 +372,23 @@
 
 (define-syntax amb
   (syntax-rules ()
-    [(_) (amb-fail)]                       ; Two shortcuts.
-    [(_ expression) expression]
+    ;; [(_) (amb-fail)]                 ; Two shortcuts.
+    ;; [(_ expression) expression]
     [(_ expression ...)
      (let ([prev-amb-fail amb-fail])
-       ((call/cc                           ; Capture a continuation to
-         (λ (k-success)                    ;   which we return possibles.
-           (call/cc
-            (λ (k-failure)                 ; k-failure will try the next
-              (set! amb-fail               ;   possible expression.
-                (λ () (k-failure #f)))
-              (k-success                   ; Note that the expression is
-               (λ ()                       ;   evaluated in tail position
-                 expression))))            ;   with respect to AMB.
-           ...
+       (call/cc                         ; Capture a continuation to
+        (λ (k-success)                  ;   which we return possibles.
+          (call/cc
+           (λ (k-failure)               ; k-failure will try the next
+             (set! amb-fail             ;   possible expression.
+               (λ () (k-failure #f)))
+             (k-success expression)))   ; Note that the expression is
+                                        ;   with respect to AMB.
+          ...
 
-           (set! amb-fail prev-amb-fail)   ; Finally, if this is reached,
-           prev-amb-fail))))]))            ;   we restore the saved fail.
+          (set! amb-fail prev-amb-fail) ; Finally, if this is reached,
+          (prev-amb-fail))))]))         ;   we restore the saved fail.
+
 
 (define request
   (λ (condition)
