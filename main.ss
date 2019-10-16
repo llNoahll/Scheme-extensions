@@ -5,8 +5,9 @@
 
 (define-syntax case-λ
   (syntax-rules ()
-    [(_ (param body) ...)
-     (case-lambda (param body) ...)]))
+    [(_ [param body ...] ...)
+     (case-lambda [param body ...] ...)]))
+
 
 (define-syntax defvar
   (syntax-rules ()
@@ -22,6 +23,7 @@
   (syntax-rules ()
     [(_ body ...)
      (begin body ...)]))
+
 
 ;; (define (F g)             ; g is some func like exp.
 ;; (λ (x n)
@@ -54,14 +56,14 @@
     (or (and (not expr1) expr2)
         (and expr1 (not expr2)))))
 
-(define true #t)
+(define true  #t)
 (define false #f)
 (define (true?  val) (not (false? val)))
 (define (false? val) (not val))
 
 
-(define nil '())
-(define null '())
+(define nil   '())
+(define null  '())
 (define empty '())
 
 (define (nil? value) (nil? value))
@@ -134,7 +136,7 @@
 
 ;;;; set IO
 
-;;read file
+;; read file
 (define read-file
   (λ (file-name)
     (let ([p (open-input-file file-name)])
@@ -344,15 +346,12 @@
             (stream-sub (stream-cdr s1) (tail s2)))])))
 
 ;;;; AMB
-;;; fail is called to backtrack when a condition fails.  At the top
-;;; level, however, there is no more to backtrack, so we signal an
-;;; error with SRFI 23.
-(define amb-fail
-  (λ ()
-    (error 'amb "Amb tree exhausted!")))
-
-
 ;;; Wang Yin's amb:
+;;
+;; (define amb-fail
+;;   (λ ()
+;;     (error 'amb "Amb tree exhausted!")))
+;;
 ;; (define-syntax amb
 ;;   (syntax-rules ()
 ;;     [(_ expression ...)
@@ -366,34 +365,58 @@
 ;;                  (set! amb-fail prev-amb-fail)
 ;;                  (k-failure 'fail)))
 ;;              (k-success expression)))
+;;
 ;;           ...
 ;;
 ;;           (prev-amb-fail))))]))
+;;
+;; (define-syntax amb-bag-of
+;;   (syntax-rules ()
+;;     [(_ expression)
+;;      (let ([prev-amb-fail (amb-fail)]
+;;            [results '()])
+;;        (if (call/cc
+;;             (λ (k)
+;;               (amb-fail (λ () (k #f)))                                     ; <-----+
+;;               (let ([value expression])  ; amb-fail will be modified by expression |
+;;                 (set! results (cons value results))                              ; |
+;;                 (k #t))))                                                        ; |
+;;            (amb))                        ; so this amb-fail may not be ------------+
+;;        (amb-fail prev-amb-fail)
+;;        (reverse! results))]))
+
+
+;;; amb-fail is called to backtrack when a condition fails.
+;;; At the top level, however, there is no more to backtrack,
+;;; so we signal an error with SRFI 23.
+(define amb-fail (make-parameter
+                  (λ () (error 'amb "Amb tree exhausted!"))))
 
 (define-syntax amb
   (syntax-rules ()
-    ;; [(_) (amb-fail)]                 ; Two shortcuts.
-    ;; [(_ expression) expression]
+    [(_) ((amb-fail))]                  ; Two shortcuts.
+    [(_ expression) expression]
     [(_ expression ...)
-     (let ([prev-amb-fail amb-fail])
+     (let ([prev-amb-fail (amb-fail)])
        (call/cc                         ; Capture a continuation to
         (λ (k-success)                  ;   which we return possibles.
           (call/cc
            (λ (k-failure)               ; k-failure will try the next
-             (set! amb-fail             ;   possible expression.
-               (λ () (k-failure #f)))
+             (amb-fail                  ;   possible expression.
+              (λ () (k-failure "This branch failed.")))
              (k-success expression)))   ; Note that the expression is
                                         ;   with respect to AMB.
           ...
 
-          (set! amb-fail prev-amb-fail) ; Finally, if this is reached,
-          (prev-amb-fail))))]))         ;   we restore the saved fail.
+          (amb-fail prev-amb-fail)      ; Finally, if this is reached,
+                                        ;   we restore the saved fail.
+          ((amb-fail)))))]))
 
 
 (define request
   (λ (condition)
     (unless condition
-      (amb-fail))))
+      (amb))))
 
 ;;; As an auxiliary example, amb-possibility-list is a special form
 ;;; that returns a list of all values its input expression may return.
@@ -404,25 +427,8 @@
        ;; This requires that AMB try its sub-forms left-to-right.
        (amb (let ([value expression])
               (set! value-list (cons value value-list))
-              (amb-fail))
+              (amb))
             (reverse value-list)))]))   ; Order it nicely.
-
-;;; amb-bag-of is similar to amb-possibility-list, except that
-;;; AMB can try its sub-forms in any order.
-(define-syntax amb-bag-of
-  (syntax-rules ()
-    [(_ expression)
-     (let ([prev-amb-fail amb-fail]
-           [results '()])
-       (if (call/cc
-            (λ (k)
-              (set! amb-fail (λ () (k #f)))                                ; <-----+
-              (let ([value expression])  ; amb-fail will be modified by expression |
-                (set! results (cons value results))                              ; |
-                (k #t))))                                                        ; |
-           (amb-fail))                   ; so this amb-fail may not be ------------+
-       (set! amb-fail prev-amb-fail)
-       (reverse! results))]))
 
 
 (define amb-range
